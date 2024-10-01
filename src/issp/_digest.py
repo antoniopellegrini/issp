@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, hmac
 
 from ._util import xor, zero_pad
 
@@ -33,7 +33,7 @@ class DigestLayer:
         if self._digest.check(message, fingerprint):
             return message
 
-        err_msg = "The message is not authentic"
+        err_msg = "The message has been tampered with"
         raise ValueError(err_msg)
 
 
@@ -50,7 +50,7 @@ class Digest(ABC):
         return fingerprint == self.compute(message)
 
 
-class EncryptedDigest(Digest):
+class EncryptedHashMAC(Digest):
     def __init__(self, digest: Digest, cipher: Cipher) -> None:
         self._digest = digest
         self._cipher = cipher
@@ -71,6 +71,19 @@ class EncryptedDigest(Digest):
         return self._digest.check(message, fingerprint)
 
 
+class KeyedHashMAC(Digest):
+    @property
+    def size(self) -> int:
+        return self._digest.size
+
+    def __init__(self, digest: Digest, key: bytes) -> None:
+        self._digest = digest
+        self._key = key
+
+    def compute(self, message: bytes) -> bytes:
+        return self._digest.compute(self._key + message + self._key)
+
+
 class XOR(Digest):
     size = 8
 
@@ -89,3 +102,15 @@ class SHA256(Digest):
         digest = hashes.Hash(hashes.SHA256())
         digest.update(message)
         return digest.finalize()
+
+
+class HMAC(Digest):
+    size = 32
+
+    def __init__(self, key: bytes) -> None:
+        self._key = key
+
+    def compute(self, message: bytes) -> bytes:
+        mac = hmac.HMAC(self._key, hashes.SHA256())
+        mac.update(message)
+        return mac.finalize()

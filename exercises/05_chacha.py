@@ -28,11 +28,11 @@ def main() -> None:
     bob = Actor("Bob")
     mallory = Actor("Mallory", quiet=False)
 
-    raw_channel = Channel()
-    alice_bob_layer = EncryptionLayer(raw_channel, ChaCha(os.urandom(32)))
+    channel = Channel()
+    alice_bob_layer = EncryptionLayer(channel, ChaCha(os.urandom(32)))
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
-    mallory.receive(raw_channel)
+    mallory.receive(channel)
     bob.receive(alice_bob_layer)
 
 
