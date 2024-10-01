@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 
 from cryptography.hazmat.primitives import hashes, hmac
 
+from ._comm import Layer
 from ._util import xor, zero_pad
 
 if TYPE_CHECKING:
-    from ._comm import Layer
     from ._encryption import Cipher
 
 
-class DigestLayer:
+class DigestLayer(Layer):
     def __init__(self, layer: Layer, digest: Digest) -> None:
         self._layer = layer
         self._digest = digest
@@ -24,7 +24,7 @@ class DigestLayer:
         self._layer.send(message + fingerprint)
 
     def receive(self) -> bytes | None:
-        if not (message := self._layer.receive()):
+        if (message := self._layer.receive()) is None:
             return None
 
         fingerprint = message[-self._digest.size :]
@@ -90,8 +90,8 @@ class XOR(Digest):
     def compute(self, message: bytes) -> bytes:
         message = zero_pad(message, self.size)
         digest = bytes(self.size)
-        for i in range(len(message) // self.size):
-            digest = xor(digest, message[i * self.size : (i + 1) * self.size])
+        for i in range(0, len(message), self.size):
+            digest = xor(digest, message[i : i + self.size])
         return digest
 
 

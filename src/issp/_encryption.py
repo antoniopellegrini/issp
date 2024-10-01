@@ -7,13 +7,11 @@ from typing import TYPE_CHECKING
 from cryptography.hazmat.primitives import ciphers, padding
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
+from ._comm import Layer
 from ._util import xor
 
-if TYPE_CHECKING:
-    from ._comm import Layer
 
-
-class EncryptionLayer:
+class EncryptionLayer(Layer):
     def __init__(self, layer: Layer, cipher: Cipher) -> None:
         self._layer = layer
         self._cipher = cipher
@@ -26,13 +24,13 @@ class EncryptionLayer:
         self._layer.send(message)
 
     def receive(self) -> bytes | None:
-        if message := self._layer.receive():
-            iv = None
-            if self._cipher.iv_size:
-                iv = message[: self._cipher.iv_size]
-                message = message[self._cipher.iv_size :]
-            return self._cipher.decrypt(message, iv)
-        return None
+        if (message := self._layer.receive()) is None:
+            return None
+        iv = None
+        if self._cipher.iv_size:
+            iv = message[: self._cipher.iv_size]
+            message = message[self._cipher.iv_size :]
+        return self._cipher.decrypt(message, iv)
 
 
 class Cipher(ABC):
@@ -83,11 +81,9 @@ class ChaCha(Cipher):
     iv_size = 16
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:
-        algorithm = algorithms.ChaCha20(self.key, iv)
-        cipher = ciphers.Cipher(algorithm, mode=None)
+        cipher = ciphers.Cipher(algorithms.ChaCha20(self.key, iv), mode=None)
         return cipher.encryptor().update(message)
 
     def decrypt(self, message: bytes, iv: bytes | None) -> bytes:
-        algorithm = algorithms.ChaCha20(self.key, iv)
-        cipher = ciphers.Cipher(algorithm, mode=None)
+        cipher = ciphers.Cipher(algorithms.ChaCha20(self.key, iv), mode=None)
         return cipher.decryptor().update(message)
