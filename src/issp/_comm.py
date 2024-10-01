@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 from . import _log as log
@@ -12,9 +14,36 @@ class Layer(ABC):
     def receive(self) -> bytes | None:
         pass
 
+    def __init__(self, layer: Layer | None = None) -> None:
+        self._layer = layer
 
-class Channel(Layer):
+    def __or__(self, lower_layer: object) -> Layer:
+        if not isinstance(lower_layer, Layer):
+            err_msg = f"Unsupported operand type(s) for |: '{type(self)}' and '{type(lower_layer)}'"
+            raise TypeError(err_msg)
+        root_layer = self.root_layer()
+        if isinstance(root_layer, PhysicalLayer):
+            err_msg = "You've hit rock bottom, my friend"
+            raise TypeError(err_msg)
+        root_layer._layer = lower_layer
+        return self
+
+    def lower_layer(self, depth: int = 1) -> Layer:
+        if depth == 0 or self._layer is None:
+            return self
+        return self._layer.lower_layer(depth - 1)
+
+    def root_layer(self) -> Layer:
+        return self if self._layer is None else self._layer.root_layer()
+
+
+class PhysicalLayer(Layer):
+    pass
+
+
+class Channel(PhysicalLayer):
     def __init__(self) -> None:
+        super().__init__()
         self._message: bytes | None = None
 
     def send(self, message: bytes) -> None:

@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
 
 class DigestLayer(Layer):
-    def __init__(self, layer: Layer, digest: Digest) -> None:
-        self._layer = layer
+    def __init__(self, layer: Layer = None, digest: Digest = None) -> None:
+        super().__init__(layer)
         self._digest = digest
 
     def send(self, message: bytes) -> None:
@@ -76,9 +76,9 @@ class KeyedHashMAC(Digest):
     def size(self) -> int:
         return self._digest.size
 
-    def __init__(self, digest: Digest, key: bytes) -> None:
+    def __init__(self, digest: Digest, key: bytes | None = None) -> None:
         self._digest = digest
-        self._key = key
+        self._key = key or os.urandom(self.size)
 
     def compute(self, message: bytes) -> bytes:
         return self._digest.compute(self._key + message + self._key)
@@ -107,8 +107,8 @@ class SHA256(Digest):
 class HMAC(Digest):
     size = 32
 
-    def __init__(self, key: bytes) -> None:
-        self._key = key
+    def __init__(self, key: bytes | None = None) -> None:
+        self._key = key or os.urandom(self.size)
 
     def compute(self, message: bytes) -> bytes:
         mac = hmac.HMAC(self._key, hashes.SHA256())

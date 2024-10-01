@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
 from cryptography.hazmat.primitives import ciphers, padding
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
@@ -12,8 +11,8 @@ from ._util import xor
 
 
 class EncryptionLayer(Layer):
-    def __init__(self, layer: Layer, cipher: Cipher) -> None:
-        self._layer = layer
+    def __init__(self, layer: Layer | None = None, cipher: Cipher | None = None) -> None:
+        super().__init__(layer)
         self._cipher = cipher
 
     def send(self, message: bytes) -> None:
@@ -51,6 +50,9 @@ class Cipher(ABC):
 
 
 class OTP(Cipher):
+    def __init__(self, key: bytes | None = None) -> None:
+        super().__init__(key or os.urandom(256))
+
     def encrypt(self, data: bytes, iv: bytes | None) -> bytes:
         del iv  # Unused
         return xor(data, self.key)
@@ -63,6 +65,9 @@ class OTP(Cipher):
 class AES(Cipher):
     iv_size = 16
     _pad = padding.PKCS7(iv_size * 8)
+
+    def __init__(self, key: bytes | None = None) -> None:
+        super().__init__(key or os.urandom(32))
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:
         encryptor = ciphers.Cipher(algorithms.AES(self.key), modes.CBC(iv)).encryptor()
@@ -79,6 +84,9 @@ class AES(Cipher):
 
 class ChaCha(Cipher):
     iv_size = 16
+
+    def __init__(self, key: bytes | None = None) -> None:
+        super().__init__(key or os.urandom(32))
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:
         cipher = ciphers.Cipher(algorithms.ChaCha20(self.key, iv), mode=None)
