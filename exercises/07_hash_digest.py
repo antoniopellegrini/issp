@@ -3,9 +3,8 @@
 # Hint: Have a look at the cryprography.hazmat.primitives.hashes module.
 # Docs: https://cryptography.io/en/latest/hazmat/primitives/cryptographic-hashes
 
-from cryptography.hazmat.primitives import hashes
 
-from issp import Actor, Channel, log
+from issp import Actor, Channel
 
 
 def main() -> None:

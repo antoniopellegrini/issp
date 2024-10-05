@@ -1,8 +1,9 @@
-# Refactor the OTP exercise to use the Cipher and EncryptionLayer classes from the issp module.
+# Refactor the OTP exercise to use the SymmetricCipher and EncryptionLayer classes
+# from the issp module.
 
 import os
 
-from issp import Actor, Channel, Cipher, EncryptionLayer
+from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
 
 
 def xor(data: bytes, key: bytes) -> bytes:
@@ -13,13 +14,11 @@ def xor(data: bytes, key: bytes) -> bytes:
     return bytes(data[i] ^ key[i] for i in range(length))
 
 
-class OTP(Cipher):
-    def encrypt(self, data: bytes, iv: bytes | None) -> bytes:
-        del iv  # Unused
+class OTP(SymmetricCipher):
+    def encrypt(self, data: bytes) -> bytes:
         return xor(data, self.key)
 
-    def decrypt(self, data: bytes, iv: bytes | None) -> bytes:
-        del iv  # Unused
+    def decrypt(self, data: bytes) -> bytes:
         return xor(data, self.key)
 
 

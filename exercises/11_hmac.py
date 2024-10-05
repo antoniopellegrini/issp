@@ -6,16 +6,14 @@
 
 import os
 
-from cryptography.hazmat.primitives import hashes, hmac
-
-from issp import Actor, Channel, Digest, DigestLayer
+from issp import Actor, AuthenticationLayer, Authenticator, Channel
 
 
-class HMAC(Digest):
+class HMAC(Authenticator):
     def __init__(self, key: bytes) -> None:
         self._key = key
 
-    def compute(self, message: bytes) -> bytes:
+    def compute_code(self, message: bytes) -> bytes:
         # Implement.
         return b""
 
@@ -25,7 +23,7 @@ def main() -> None:
     bob = Actor("Bob")
     mallory = Actor("Mallory", quiet=False)
     channel = Channel()
-    alice_bob_layer = DigestLayer(channel, HMAC(os.urandom(32)))
+    alice_bob_layer = AuthenticationLayer(channel, HMAC(os.urandom(32)))
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
@@ -38,7 +36,7 @@ def main() -> None:
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
-    mallory_layer = DigestLayer(channel, HMAC(os.urandom(32)))
+    mallory_layer = AuthenticationLayer(channel, HMAC(os.urandom(32)))
     mallory.send(mallory_layer, b"#!%* you, Bob! - Alice")
     bob.receive(alice_bob_layer)
 

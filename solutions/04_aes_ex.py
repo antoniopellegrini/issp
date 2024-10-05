@@ -1,17 +1,15 @@
-# Encrypt the communication between Alice and Bob using the AES block cipher in CBC mode.
-#
-# Hint: Have a look at the cryprography.hazmat.primitives.ciphers module.
-# Docs: https://cryptography.io/en/latest/hazmat/primitives/symmetric-encryption
+# Refactor the AES exercise to use the SymmetricCipher and EncryptionLayer classes
+# from the issp module.
 
 import os
 
 from cryptography.hazmat.primitives import ciphers, padding
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
-from issp import Actor, Channel, Cipher, EncryptionLayer
+from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
 
 
-class AES(Cipher):
+class AES(SymmetricCipher):
     iv_size = 16
 
     def encrypt(self, message: bytes, iv: bytes) -> bytes:

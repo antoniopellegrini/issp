@@ -5,13 +5,10 @@
 
 import os
 
-from cryptography.hazmat.primitives import ciphers
-from cryptography.hazmat.primitives.ciphers import algorithms
-
-from issp import Actor, Channel, Cipher, EncryptionLayer
+from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
 
 
-class ChaCha(Cipher):
+class ChaCha(SymmetricCipher):
     iv_size = 16
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:

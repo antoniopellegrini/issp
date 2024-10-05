@@ -1,10 +1,12 @@
 # Verify the integrity of messages exchanged between Alice and Bob using 8 bytes XOR hash digests.
+#
+# Hint: you can use the xor and zero_pad functions from the issp module.
 
-from issp import Actor, Channel, Digest, DigestLayer, xor, zero_pad
+from issp import Actor, AuthenticationLayer, Authenticator, Channel
 
 
-class XOR(Digest):
-    def compute(self, message: bytes) -> bytes:
+class XOR(Authenticator):
+    def compute_code(self, message: bytes) -> bytes:
         # Implement
         return b""
 
@@ -14,7 +16,7 @@ def main() -> None:
     bob = Actor("Bob")
     mallory = Actor("Mallory", quiet=True)
     channel = Channel()
-    alice_bob_layer = DigestLayer(channel, XOR())
+    alice_bob_layer = AuthenticationLayer(channel, XOR())
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
@@ -27,7 +29,7 @@ def main() -> None:
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
-    mallory_layer = DigestLayer(channel, XOR())
+    mallory_layer = AuthenticationLayer(channel, XOR())
     mallory.send(mallory_layer, b"#!%* you, Bob! - Alice")
     bob.receive(alice_bob_layer)
 

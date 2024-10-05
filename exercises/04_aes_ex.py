@@ -1,14 +1,12 @@
-# Refactor the AES exercise to use the Cipher and EncryptionLayer classes from the issp module.
+# Refactor the AES exercise to use the SymmetricCipher and EncryptionLayer classes
+# from the issp module.
 
 import os
 
-from cryptography.hazmat.primitives import ciphers, padding
-from cryptography.hazmat.primitives.ciphers import algorithms, modes
-
-from issp import Actor, Channel, Cipher, EncryptionLayer
+from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
 
 
-class AES(Cipher):
+class AES(SymmetricCipher):
     iv_size = 16
 
     def encrypt(self, message: bytes, iv: bytes | None) -> bytes:

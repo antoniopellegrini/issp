@@ -2,9 +2,8 @@
 #
 # Hint: You can use the pre-implemented ciphers from the issp module (e.g. AES or ChaCha).
 
-import os
 
-from issp import AES, Actor, Channel, EncryptionLayer
+from issp import Actor, Channel
 
 
 def main() -> None:

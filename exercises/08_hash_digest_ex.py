@@ -1,14 +1,14 @@
-# Refactor the hash digest exercise to use the Digest and DigestLayer classes from the issp module.
-
-from cryptography.hazmat.primitives import hashes
-
-from issp import Actor, Channel, Digest, DigestLayer
+# Refactor the hash digest exercise to use the Authenticator and AuthenticationLayer classes
+# from the issp module.
 
 
-class SHA256(Digest):
+from issp import Actor, AuthenticationLayer, Authenticator, Channel
+
+
+class SHA256(Authenticator):
     size = 32
 
-    def compute(self, message: bytes) -> bytes:
+    def compute_code(self, message: bytes) -> bytes:
         # Implement digest computation here.
         return b""
 
@@ -18,7 +18,7 @@ def main() -> None:
     bob = Actor("Bob")
     mallory = Actor("Mallory", quiet=True)
     channel = Channel()
-    alice_bob_layer = DigestLayer(channel, SHA256())
+    alice_bob_layer = AuthenticationLayer(channel, SHA256())
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
@@ -31,7 +31,7 @@ def main() -> None:
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     mallory.receive(channel)
-    mallory_layer = DigestLayer(channel, SHA256())
+    mallory_layer = AuthenticationLayer(channel, SHA256())
     mallory.send(mallory_layer, b"#!%* you, Bob! - Alice")
     bob.receive(alice_bob_layer)
 

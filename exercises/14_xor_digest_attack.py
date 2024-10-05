@@ -5,7 +5,7 @@
 
 import os
 
-from issp import AES, XOR, Actor, Channel, DigestLayer, EncryptedHashMAC, xor, zero_pad
+from issp import AES, XOR, Actor, AuthenticationLayer, Channel, EncryptedHashMAC
 
 
 def main() -> None:
@@ -16,7 +16,7 @@ def main() -> None:
 
     xor_digest = XOR()
     digest = EncryptedHashMAC(xor_digest, AES(os.urandom(32)))
-    alice_bob_layer = DigestLayer(channel, digest)
+    alice_bob_layer = AuthenticationLayer(channel, digest)
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     # Attack 1.

@@ -1,8 +1,9 @@
-# Refactor the OTP exercise to use the Cipher and EncryptionLayer classes from the issp module.
+# Refactor the OTP exercise to use the SymmetricCipher and EncryptionLayer classes
+# from the issp module.
 
 import os
 
-from issp import Actor, Channel, Cipher, EncryptionLayer, log
+from issp import Actor, Channel, log
 
 
 def xor(data: bytes, key: bytes) -> bytes:

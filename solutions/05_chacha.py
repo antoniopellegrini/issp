@@ -8,17 +8,17 @@ import os
 from cryptography.hazmat.primitives import ciphers
 from cryptography.hazmat.primitives.ciphers import algorithms
 
-from issp import Actor, Channel, Cipher, EncryptionLayer
+from issp import Actor, Channel, EncryptionLayer, SymmetricCipher
 
 
-class ChaCha(Cipher):
+class ChaCha(SymmetricCipher):
     iv_size = 16
 
-    def encrypt(self, message: bytes, iv: bytes | None) -> bytes:
+    def encrypt(self, message: bytes, iv: bytes) -> bytes:
         cipher = ciphers.Cipher(algorithms.ChaCha20(self.key, iv), mode=None)
         return cipher.encryptor().update(message)
 
-    def decrypt(self, message: bytes, iv: bytes | None) -> bytes:
+    def decrypt(self, message: bytes, iv: bytes) -> bytes:
         cipher = ciphers.Cipher(algorithms.ChaCha20(self.key, iv), mode=None)
         return cipher.decryptor().update(message)
 

@@ -15,26 +15,39 @@ class Layer(ABC):
         pass
 
     def __init__(self, layer: Layer | None = None) -> None:
-        self._layer = layer
+        self.upper_layer: Layer | None = None
+        self.lower_layer = layer
+        if layer:
+            layer.upper_layer = self
 
     def __or__(self, lower_layer: object) -> Layer:
         if not isinstance(lower_layer, Layer):
             err_msg = f"Unsupported operand type(s) for |: '{type(self)}' and '{type(lower_layer)}'"
             raise TypeError(err_msg)
-        root_layer = self.root_layer()
+        root_layer = self.bottom_layer()
         if isinstance(root_layer, PhysicalLayer):
             err_msg = "You've hit rock bottom, my friend"
             raise TypeError(err_msg)
-        root_layer._layer = lower_layer
+        root_layer.lower_layer = lower_layer
+        lower_layer.upper_layer = root_layer
         return self
 
-    def lower_layer(self, depth: int = 1) -> Layer:
-        if depth == 0 or self._layer is None:
+    def get_layer(self, depth: int) -> Layer:
+        if depth == 0:
             return self
-        return self._layer.lower_layer(depth - 1)
+        if depth < 0:
+            if self.lower_layer is None:
+                return self
+            return self.lower_layer.get_layer(depth + 1)
+        if self.upper_layer is None:
+            return self
+        return self.upper_layer.get_layer(depth - 1)
 
-    def root_layer(self) -> Layer:
-        return self if self._layer is None else self._layer.root_layer()
+    def top_layer(self) -> Layer:
+        return self if self.upper_layer is None else self.upper_layer.top_layer()
+
+    def bottom_layer(self) -> Layer:
+        return self if self.lower_layer is None else self.lower_layer.bottom_layer()
 
 
 class PhysicalLayer(Layer):
