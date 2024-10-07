@@ -17,7 +17,7 @@ class EncryptionLayer(Layer):
         self._cipher = cipher
 
     def send(self, message: bytes) -> None:
-        if isinstance(self._cipher, SymmetricCipher) and self._cipher.iv_size:
+        if self._cipher.iv_size:
             iv = os.urandom(self._cipher.iv_size)
             kwargs = {"iv": iv}
         else:
@@ -32,13 +32,21 @@ class EncryptionLayer(Layer):
         if (message := self.lower_layer.receive()) is None:
             return None
         kwargs = {}
-        if isinstance(self._cipher, SymmetricCipher) and self._cipher.iv_size:
+        if self._cipher.iv_size:
             kwargs["iv"] = message[: self._cipher.iv_size]
             message = message[self._cipher.iv_size :]
         return self._cipher.decrypt(message, **kwargs)
 
 
 class Cipher(ABC):
+    @property
+    def iv_size(self) -> int:
+        return 0
+
+    @property
+    def key_size(self) -> int:
+        return 0
+
     @abstractmethod
     def encrypt(self, message: bytes, *, iv: bytes) -> bytes:
         pass
@@ -50,12 +58,12 @@ class Cipher(ABC):
 
 class SymmetricCipher(Cipher, ABC):
     @property
-    def iv_size(self) -> int:
+    def default_key_size(self) -> int:
         return 0
 
     @property
-    def default_key_size(self) -> int:
-        return 0
+    def key_size(self) -> int:
+        return len(self.key)
 
     def __init__(self, key: bytes | None = None) -> None:
         super().__init__()
@@ -107,7 +115,7 @@ class ChaCha(SymmetricCipher):
         return cipher.decryptor().update(message)
 
 
-class RSACipher(AsymmetricCipher):
+class RSA(AsymmetricCipher):
     _hash = hashes.SHA256()
     _padding = asymmetric_padding.OAEP(
         mgf=asymmetric_padding.MGF1(algorithm=_hash),
@@ -115,9 +123,16 @@ class RSACipher(AsymmetricCipher):
         label=None,
     )
 
-    def __init__(self, key: rsa.RSAPublicKey | rsa.RSAPrivateKey | None = None) -> None:
+    @property
+    def key_size(self) -> int:
+        return self.public_key.key_size // 8
+
+    def __init__(self, key: rsa.RSAPublicKey | rsa.RSAPrivateKey | int | None = None) -> None:
         if key is None:
-            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            key = 2048
+
+        if isinstance(key, int):
+            key = rsa.generate_private_key(public_exponent=65537, key_size=key)
 
         if isinstance(key, rsa.RSAPrivateKey):
             self.private_key = key
@@ -134,3 +149,26 @@ class RSACipher(AsymmetricCipher):
             err_msg = "Cannot decrypt without a private key"
             raise ValueError(err_msg)
         return self.private_key.decrypt(message, self._padding)
+
+
+class DigitalEnvelope(Cipher):
+    @property
+    def iv_size(self) -> int:
+        return self.message_cipher.iv_size
+
+    def __init__(
+        self,
+        message_cipher: SymmetricCipher,
+        key_cipher: AsymmetricCipher,
+    ) -> None:
+        self.message_cipher = message_cipher
+        self.key_cipher = key_cipher
+
+    def encrypt(self, message: bytes, iv: bytes) -> bytes:
+        enc_key = self.key_cipher.encrypt(self.message_cipher.key)
+        enc_message = self.message_cipher.encrypt(message, iv)
+        return enc_message + enc_key
+
+    def decrypt(self, message: bytes, iv: bytes) -> bytes:
+        self.message_cipher.key = self.key_cipher.decrypt(message[-self.key_cipher.key_size :])
+        return self.message_cipher.decrypt(message[: -self.key_cipher.key_size], iv)

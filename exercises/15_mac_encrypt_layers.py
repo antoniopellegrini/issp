@@ -1,8 +1,9 @@
 # Secure the communication between Alice and Bob by adding a stack of security layers
-# made up of an AES encryption layer and an HMAC digest layer, and inspect the output of
-# each layer after sending a message from Alice to Bob.
+# made up of an AES encryption layer and an HMAC digest layer.
+# Inspect the output of each layer after sending a message from Alice to Bob.
 #
-# Hint: The output of each layer can be retrieved by calling the receive() method on the layer.
+# Hint: The output of each layer can be retrieved by calling the receive() method
+#       on the subsequent layer.
 
 
 from issp import Actor, Channel

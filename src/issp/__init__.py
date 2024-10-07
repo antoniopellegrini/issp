@@ -3,22 +3,22 @@
 from . import _log as log
 from ._authentication import (
     HMAC,
-    RSA,
     SHA256,
     XOR,
     AuthenticationLayer,
     Authenticator,
     EncryptedHashMAC,
     KeyedHashMAC,
+    RSASigner,
 )
-from ._communication import Actor, Channel
+from ._communication import Actor, Channel, Layer
 from ._encryption import (
     AES,
     OTP,
+    RSA,
     AsymmetricCipher,
     Cipher,
     EncryptionLayer,
-    RSACipher,
     SymmetricCipher,
 )
 from ._util import xor, zero_pad
@@ -35,9 +35,10 @@ __all__ = [
     "EncryptionLayer",
     "HMAC",
     "KeyedHashMAC",
+    "Layer",
     "OTP",
+    "RSASigner",
     "RSA",
-    "RSACipher",
     "SHA256",
     "SymmetricCipher",
     "XOR",

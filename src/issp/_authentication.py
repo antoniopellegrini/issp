@@ -118,7 +118,7 @@ class HMAC(Authenticator):
         return mac.finalize()
 
 
-class RSA(Authenticator):
+class RSASigner(Authenticator):
     _hash = hashes.SHA256()
     _padding = padding.PSS(
         mgf=padding.MGF1(_hash),
