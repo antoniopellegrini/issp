@@ -18,6 +18,7 @@ from ._encryption import (
     RSA,
     AsymmetricCipher,
     Cipher,
+    DigitalEnvelope,
     EncryptionLayer,
     SymmetricCipher,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "Cipher",
     "Authenticator",
     "AuthenticationLayer",
+    "DigitalEnvelope",
     "EncryptedHashMAC",
     "EncryptionLayer",
     "HMAC",

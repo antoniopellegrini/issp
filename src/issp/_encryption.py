@@ -165,7 +165,9 @@ class DigitalEnvelope(Cipher):
         self.key_cipher = key_cipher
 
     def encrypt(self, message: bytes, iv: bytes) -> bytes:
-        enc_key = self.key_cipher.encrypt(self.message_cipher.key)
+        key = os.urandom(self.message_cipher.default_key_size)
+        self.message_cipher.key = key
+        enc_key = self.key_cipher.encrypt(key)
         enc_message = self.message_cipher.encrypt(message, iv)
         return enc_message + enc_key
 
