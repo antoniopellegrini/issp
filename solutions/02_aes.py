@@ -39,13 +39,20 @@ def main() -> None:
 
     message = b"Hello, Bob! - Alice"
     log.info("Alice wants to send: %s", message)
+
+    # The initialization vector must be sent together with the encrypted message.
     message = iv + encrypt(message, key, iv)
     alice.send(channel, message)
     mallory.receive(channel)
 
     try:
+        # Bob must first separate the initialization vector from the encrypted message.
         message = bob.receive(channel)
-        message = decrypt(message[iv_size:], key, message[:iv_size])
+        iv = message[:iv_size]
+        message = message[iv_size:]
+
+        # Then he can decrypt the message.
+        message = decrypt(message, key, iv)
     except ValueError:
         log.info("Bob received a corrupted message")
     else:

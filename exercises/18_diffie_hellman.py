@@ -1,4 +1,4 @@
-# Implement the Diffie-Hellman key exchange.
+# Implement the Diffie-Hellman key exchange scheme.
 #
 # Hint: Have a look at the cryprography.hazmat.primitives.asymmetric module.
 # Docs: https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dh

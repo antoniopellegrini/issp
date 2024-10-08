@@ -1,7 +1,7 @@
 # Help Mallory perform two attacks on the encrypted XOR hash scheme used by Alice and Bob:
 #
-# 1. Corrupt the message sent by Alice to Bob by scrambling the bytes, but keeping the hash intact.
-# 2. Forge a message from Alice to Bob by sending a message with a valid hash.
+# 1. Corrupt the message sent by Alice to Bob by scrambling the bytes, but keeping the MAC intact.
+# 2. Forge a message from Alice to Bob, again keeping the MAC intact.
 
 import os
 
