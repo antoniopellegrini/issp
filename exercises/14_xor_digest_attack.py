@@ -15,8 +15,8 @@ def main() -> None:
     channel = Channel()
 
     xor_digest = XOR()
-    digest = EncryptedHashMAC(xor_digest, AES(os.urandom(32)))
-    alice_bob_layer = AuthenticationLayer(channel, digest)
+    mac = EncryptedHashMAC(xor_digest, AES(os.urandom(32)))
+    alice_bob_layer = AuthenticationLayer(channel, mac)
 
     alice.send(alice_bob_layer, b"Hello, Bob! - Alice")
     # Attack 1.
