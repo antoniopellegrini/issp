@@ -70,6 +70,12 @@ class SymmetricCipher(Cipher, ABC):
         self.key = key or os.urandom(self.default_key_size)
 
 
+class BlockCipher(SymmetricCipher, ABC):
+    @property
+    def block_size(self) -> int:
+        return self.iv_size
+
+
 class AsymmetricCipher(Cipher, ABC):
     pass
 
@@ -77,29 +83,44 @@ class AsymmetricCipher(Cipher, ABC):
 class OTP(SymmetricCipher):
     default_key_size = 256
 
-    def encrypt(self, data: bytes) -> bytes:
+    def _xor(self, data: bytes) -> bytes:
+        if len(data) > len(self.key):
+            err_msg = f"Data ({len(data)} B) is too long for the key ({len(self.key)} B)"
+            raise ValueError(err_msg)
         return xor(data, self.key)
+
+    def encrypt(self, data: bytes) -> bytes:
+        return self._xor(data)
 
     def decrypt(self, data: bytes) -> bytes:
-        return xor(data, self.key)
+        return self._xor(data)
 
 
-class AES(SymmetricCipher):
+class AES(BlockCipher):
     iv_size = 16
     default_key_size = 32
     _pad = padding.PKCS7(iv_size * 8)
 
-    def encrypt(self, message: bytes, iv: bytes) -> bytes:
-        encryptor = ciphers.Cipher(algorithms.AES(self.key), modes.CBC(iv)).encryptor()
-        padder = self._pad.padder()
-        message = padder.update(message) + padder.finalize()
+    def __init__(self, key: bytes | None = None) -> None:
+        super().__init__(key)
+        self.apply_padding = True
+
+    def encrypt(self, message: bytes, iv: bytes | None = None) -> bytes:
+        mode = modes.CBC(iv) if iv else modes.ECB()  # noqa: S305
+        encryptor = ciphers.Cipher(algorithms.AES(self.key), mode).encryptor()
+        if self.apply_padding:
+            padder = self._pad.padder()
+            message = padder.update(message) + padder.finalize()
         return encryptor.update(message) + encryptor.finalize()
 
-    def decrypt(self, message: bytes, iv: bytes) -> bytes:
-        decryptor = ciphers.Cipher(algorithms.AES(self.key), modes.CBC(iv)).decryptor()
-        unpadder = self._pad.unpadder()
+    def decrypt(self, message: bytes, iv: bytes | None = None) -> bytes:
+        mode = modes.CBC(iv) if iv else modes.ECB()  # noqa: S305
+        decryptor = ciphers.Cipher(algorithms.AES(self.key), mode).decryptor()
         message = decryptor.update(message) + decryptor.finalize()
-        return unpadder.update(message) + unpadder.finalize()
+        if self.apply_padding:
+            unpadder = self._pad.unpadder()
+            message = unpadder.update(message) + unpadder.finalize()
+        return message
 
 
 class ChaCha(SymmetricCipher):
