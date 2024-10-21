@@ -3,6 +3,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 
+from ._authentication import SHA256
 from ._encryption import AES, BlockCipher
 from ._util import byte_size, xor
 
@@ -48,7 +49,7 @@ class LCG(RNG[int]):
         return self._state
 
     def set_seed(self, seed: int) -> None:
-        self._state = seed
+        self._state = seed % self._m
 
 
 class CounterRNG(RNG[bytes]):
@@ -83,6 +84,73 @@ class ANSIx917(RNG[bytes]):
 
     def set_seed(self, seed: bytes) -> None:
         self._cipher.key = seed
+
+
+class EntropySource:
+    def __init__(self, entropy_bytes: int) -> None:
+        self._entropy_bytes = entropy_bytes
+
+    def get_entropy(self) -> bytes:
+        return os.urandom(self._entropy_bytes)
+
+
+class EntropyPool:
+    def __init__(self, initial_entropy_bytes: int = 8) -> None:
+        initial_entropy = os.urandom(initial_entropy_bytes) if initial_entropy_bytes else b""
+        self._deskewer = SHA256()
+        self._pool = bytearray(initial_entropy)
+
+    def __len__(self) -> int:
+        return len(self._pool)
+
+    def add_entropy(self, entropy: bytes) -> None:
+        self._pool.extend(entropy)
+
+    def get_entropy(self) -> bytes:
+        entropy = self._deskewer.compute_code(self._pool)
+        self._pool.clear()
+        return entropy
+
+
+class Fortuna(RNG[bytes]):
+    def __init__(self, sources: int = 5, pools: int = 5, reseed_length: int = 120) -> None:
+        self._sources = [EntropySource(2**i) for i in range(sources)]
+        self._pools = [EntropyPool() for _ in range(pools)]
+        self._cipher = AES()
+        self._hash = SHA256()
+        self._reseed_length = reseed_length
+        self._reseed_count = 0
+        self._count = 0
+
+    def _accumulate_entropy(self) -> None:
+        for source in self._sources:
+            for pool in self._pools:
+                pool.add_entropy(source.get_entropy())
+
+    def _get_entropy(self) -> bytes:
+        entropy = bytearray()
+        for i, pool in enumerate(self._pools):
+            if self._reseed_count % (2**i) == 0:
+                entropy.extend(pool.get_entropy())
+        return entropy
+
+    def _reseed(self) -> None:
+        self._reseed_count += 1
+        entropy = self._get_entropy()
+        key = self._hash.compute_code(self._cipher.key + self._hash.compute_code(entropy))
+        self.set_seed(key)
+
+    def set_seed(self, seed: bytes) -> None:
+        self._cipher.key = seed
+
+    def next_value(self) -> bytes:
+        self._accumulate_entropy()
+
+        if len(self._pools[0]) >= self._reseed_length:
+            self._reseed()
+
+        self._count += 1
+        return self._cipher.encrypt(self._count.to_bytes(self._cipher.block_size))
 
 
 class TRNG(RNG[bytes]):
