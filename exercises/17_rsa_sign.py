@@ -23,7 +23,7 @@ def main() -> None:
     # Uncomment the next line to let Mallory tamper with the message.
     # mallory.send(channel, mallory.receive(channel)[8:])
 
-    received_message = bob.receive(channel)
+    message = bob.receive(channel)
 
     # Verify the signature here.
 
