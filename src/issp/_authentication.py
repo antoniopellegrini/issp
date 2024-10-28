@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from ._communication import Layer
+from ._hash import sha256
 from ._util import xor, zero_pad
 
 if TYPE_CHECKING:
@@ -101,9 +102,7 @@ class SHA256(Authenticator):
     code_size = 32
 
     def compute_code(self, message: bytes) -> bytes:
-        digest = hashes.Hash(hashes.SHA256())
-        digest.update(message)
-        return digest.finalize()
+        return sha256(message)
 
 
 class HMAC(Authenticator):

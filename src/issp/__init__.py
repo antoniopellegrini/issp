@@ -23,7 +23,13 @@ from ._encryption import (
     EncryptionLayer,
     SymmetricCipher,
 )
-from ._random import LCG, RNG, TRNG, ANSIx917, CounterRNG
+from ._hash import scrypt, scrypt_fast, sha256
+from ._password import (
+    common_passwords,
+    generate_password_database,
+    random_common_password,
+)
+from ._random import LCG, RNG, TRNG, ANSIx917, CounterRNG, random_int, random_string
 from ._util import byte_size, xor, zero_pad
 
 __all__ = [
@@ -53,7 +59,15 @@ __all__ = [
     "TRNG",
     "XOR",
     "byte_size",
+    "common_passwords",
+    "generate_password_database",
     "log",
+    "random_common_password",
+    "random_int",
+    "random_string",
+    "scrypt",
+    "scrypt_fast",
+    "sha256",
     "xor",
     "zero_pad",
 ]

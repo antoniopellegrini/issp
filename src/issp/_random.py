@@ -1,4 +1,6 @@
 import os
+import secrets
+import string
 import sys
 import time
 from abc import ABC, abstractmethod
@@ -117,6 +119,7 @@ class Fortuna(RNG[bytes]):
         self._sources = [EntropySource(2**i) for i in range(sources)]
         self._pools = [EntropyPool() for _ in range(pools)]
         self._cipher = AES()
+        self._cipher.apply_padding = False
         self._hash = SHA256()
         self._reseed_length = reseed_length
         self._reseed_count = 0
@@ -162,3 +165,17 @@ class TRNG(RNG[bytes]):
 
     def generate(self, size: int) -> bytes:
         return os.urandom(size)
+
+
+def random_string(
+    length: int,
+    charset: str = string.printable,
+) -> str:
+    return "".join(secrets.choice(charset) for _ in range(length))
+
+
+def random_int(
+    min_value: int = 0,
+    max_value: int = 2**32 - 1,
+) -> int:
+    return secrets.randbelow(max_value - min_value + 1) + min_value

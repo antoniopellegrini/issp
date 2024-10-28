@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from abc import ABC, abstractmethod
 
 from . import _log as log
@@ -71,21 +73,23 @@ class Actor:
         self.name = name
         self._quiet = quiet
 
-    def send(self, layer: Layer, message: bytes) -> None:
+    def send(self, layer: Layer, message: bytes | object) -> None:
         try:
-            layer.send(message)
+            layer.send(_try_encode(message))
         except Exception as e:
-            self._log("was unable to send: %s (%s)", _try_decode(message), str(e))
+            self._log("was unable to send: %s (%s)", message, str(e))
         else:
             self._log("sent: %s", _try_decode(message))
 
-    def receive(self, layer: Layer) -> bytes | None:
+    def receive(self, layer: Layer, *, decode: bool = True) -> bytes | object | None:
         try:
             message = layer.receive()
         except Exception as e:
             self._log("was unable to receive: %s", str(e))
             return None
-        self._log("received: %s", _try_decode(message))
+        if decode:
+            message = _try_decode(message)
+        self._log("received: %s", message)
         return message
 
     def _log(self, fmt: str, *args: object) -> None:
@@ -93,8 +97,28 @@ class Actor:
             log.info("%s " + fmt, self.name, *args)
 
 
-def _try_decode(message: bytes | None) -> bytes | str | None:
+def _default_encode(o: object) -> str | object:
+    if isinstance(o, bytes):
+        return base64.b64encode(o).decode("ascii")
+    err_msg = f"Object of type '{o.__class__.__name__}' is not JSON serializable"
+    raise TypeError(err_msg)
+
+
+def _default_decode(d: dict) -> object:
+    return {key: base64.b64decode(value) if "b64" in key else value for key, value in d.items()}
+
+
+def _try_encode(message: bytes | object) -> bytes:
     try:
-        return message.decode() if message else ""
-    except UnicodeDecodeError:
+        if isinstance(message, bytes):
+            return message
+        return json.dumps(message, default=_default_encode).encode()
+    except Exception:
+        return message
+
+
+def _try_decode(message: bytes | None) -> bytes | object | None:
+    try:
+        return None if message is None else json.loads(message, object_hook=_default_decode)
+    except Exception:
         return message

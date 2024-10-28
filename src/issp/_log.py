@@ -4,10 +4,11 @@ import functools
 import logging
 import sys
 from logging import CRITICAL, DEBUG, ERROR, INFO, WARNING
+from time import perf_counter_ns as tick
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable, Iterator, Sequence
 
 
 _LOGGER = logging.getLogger("issp")
@@ -48,6 +49,61 @@ def log(level: int | str, msg: str, *args: object, **kwargs: object) -> None:
 
     if title:
         _LOGGER.log(level, "=====[ End %s ]=====", title, extra={"noformat": True})
+
+
+def _format_time(interval: int) -> str:
+    units = ("ns", "μs", "ms", "s")
+    while interval >= 10**3 and len(units) > 1:
+        interval /= 10**3
+        units = units[1:]
+    return f"{interval:.2f} {units[0]}"
+
+
+def _format_progress(progress: str, current: str | None, desc: str | None) -> str:
+    msg = f"{desc}: {progress}" if desc else progress
+    if current:
+        msg += f" (current: {current})"
+    return msg
+
+
+def percent[T](
+    sequence: Sequence[T],
+    desc: str | None = None,
+    *,
+    print_current: bool = True,
+) -> Iterator[T]:
+    first_timestamp = tick()
+    last_timestamp = first_timestamp
+    sequence_length = len(sequence)
+    progress = 0
+    for i, item in enumerate(sequence):
+        cur_timestamp = tick()
+        new_progress = int(i / sequence_length * 100)
+        if cur_timestamp - last_timestamp > 10**9 and new_progress != progress:
+            last_timestamp = cur_timestamp
+            progress = new_progress
+            info(_format_progress(f"{progress}%", item if print_current else None, desc))
+        yield item
+    info(_format_progress(f"100% ({_format_time(tick() - first_timestamp)})", None, desc))
+
+
+def progress[T](
+    iterable: Iterable[T],
+    desc: str | None = None,
+    *,
+    print_current: bool = True,
+) -> Iterator[T]:
+    first_timestamp = tick()
+    last_timestamp = first_timestamp
+    progress = 0
+    try:
+        for i, item in enumerate(iterable):
+            if (cur_timestamp := tick()) - last_timestamp > 10**9 and i != progress:
+                last_timestamp = cur_timestamp
+                info(_format_progress(f"{i}", item if print_current else None, desc))
+            yield item
+    finally:
+        info(_format_progress(f"done ({i}, {_format_time(tick() - first_timestamp)})", None, desc))
 
 
 def debug(msg: str, *args: object, **kwargs: object) -> None:
