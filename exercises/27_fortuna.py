@@ -2,7 +2,7 @@
 #
 # - It should have 5 entropy sources and 5 entropy pools.
 # - The 5 entropy sources should provide 1, 2, 4, 8, and 16 bytes of entropy, respectively.
-# - It should reseed every time the first pool has at least 120 bytes of entropy.
+# - It should reseed every time the first pool has at least 240 bytes of entropy.
 # - You don't need to manage the seed file.
 
 import os
@@ -58,9 +58,8 @@ def main() -> None:
 
     for i in range(128):
         time.sleep(1.0)
-        key = rng.generate(32)
-        log.info("Key: %s", key)
-        cipher.key = key
+        cipher.key = rng.generate(cipher.key_size)
+        log.info("Key: %s", cipher.key)
         message = f"{i}. Hello, Bob! - Alice"
         alice.send(enc_layer, message.encode())
         bob.receive(enc_layer)
