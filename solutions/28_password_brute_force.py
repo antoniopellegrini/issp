@@ -15,7 +15,7 @@ def brute_force(charset: str) -> Iterator[str]:
 
 def main() -> None:
     charset = string.ascii_lowercase
-    password = random_common_password(length=6, charset=charset)
+    password = random_common_password(length=5, charset=charset)
     log.info("Password to crack: %s", password)
 
     # Note: we are deliberately using a fast hash function to make brute-forcing feasible

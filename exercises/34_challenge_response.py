@@ -1,8 +1,8 @@
-# 1) Implement a naive authentication protocol where the user authenticates by sending
-#    a username and password to the server. The server should store the password hashed
-#    and salted using a slow hash function.
+# 1) Implement a password-based challenge-response protocol. The server should store the password
+#    hashed and salted using a slow hash function.
 #
-# 2) Help Mallory attack the protocol by replaying Alice's transaction request.
+# 2) Help Mallory attack the protocol by replaying Alice's transaction requests.
+#    Is the attack successful? Why?
 
 
 from issp import (
@@ -13,17 +13,24 @@ from issp import (
     Channel,
     EncryptionLayer,
     RSASigner,
-    log,
 )
 
 
 class Server(BankServer):
+    def __init__(self, name: str, *, quiet: bool = False) -> None:
+        super().__init__(name, quiet=quiet)
+        self.handlers["request_transaction"] = self.send_challenge
+
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement. Return True if the registration was successful, False otherwise.
+        # Implement.
         return False
 
+    def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
+        # Implement by returning the challenge and stored salt.
+        return {"challenge": None, "salt": None}
+
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement. Return True if the authentication was successful, False otherwise.
+        # Implement.
         return False
 
 
@@ -38,7 +45,7 @@ def main() -> None:
     message = {
         "action": "register",
         "user": mallory.name,
-        "password": "p4ssw0rd",
+        "password": "s3cr3t",
         "balance": 1000.0,
     }
     mallory.send(channel, message)
@@ -54,19 +61,30 @@ def main() -> None:
     alice.send(secure_channel, message)
     server.handle_request(secure_channel)
 
+    # Transaction request.
+    message = {
+        "action": "request_transaction",
+        "user": alice.name,
+    }
+    alice.send(secure_channel, message)
+
+    # Challenge.
+    server.handle_request(secure_channel)
+    message = alice.receive(secure_channel)
+
     # Authenticated transaction.
+    token = b""  # Implement the response to the challenge.
     message = {
         "action": "perform_transaction",
         "user": alice.name,
-        "password": alice_password,
+        "token": token,
         "recipient": "Mallory",
         "amount": 1000.0,
     }
     alice.send(secure_channel, message)
     server.handle_request(secure_channel)
 
-    # Replay an authenticated transaction request.
-    log.info("Replaying authenticated transaction request...")
+    # Replay an authentication sequence.
 
 
 if __name__ == "__main__":
