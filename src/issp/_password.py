@@ -1,15 +1,61 @@
 import os
 import random
 import string
+import time
+from abc import abstractmethod
 from collections.abc import Callable
 from functools import cache
 from pathlib import Path
 
 from . import _log as log
-from ._hash import scrypt
-from ._random import random_int, random_string
+from ._functions import hmac_sha1, scrypt
+from ._random import random_choice, random_int, random_string
 
 RES_DIR = Path(__file__).parent / "res"
+
+
+def _hotp(key: bytes, counter: int, digits: int = 6) -> int:
+    mac = hmac_sha1(counter.to_bytes(8), key)
+    return (int.from_bytes(mac) & 0x7FFFFFFF) % 10**digits
+
+
+class OTPGenerator:
+    @abstractmethod
+    def get_otp(self) -> int:
+        pass
+
+    @abstractmethod
+    def synchronize(self, value: int) -> None:
+        pass
+
+
+class HOTP(OTPGenerator):
+    def __init__(self, key: bytes, digits: int = 6, counter: int = 0) -> None:
+        self._key = key
+        self._digits = max(1, min(10, digits))
+        self._counter = max(0, counter)
+
+    def get_otp(self) -> int:
+        self._counter += 1
+        return _hotp(self._key, self._counter, self._digits)
+
+    def synchronize(self, value: int) -> None:
+        self._counter = value
+
+
+class TOTP(OTPGenerator):
+    def __init__(self, key: bytes, digits: int = 6, period: int = 30, epoch: int = 0) -> None:
+        self._key = key
+        self._digits = max(1, min(10, digits))
+        self._period = max(1, period)
+        self._epoch = epoch
+
+    def get_otp(self) -> int:
+        counter = int((time.time() - self._epoch) / self._period)
+        return _hotp(self._key, counter, self._digits)
+
+    def synchronize(self, value: int) -> None:
+        self._epoch = value
 
 
 @cache
@@ -19,15 +65,11 @@ def common_passwords() -> list[str]:
 
 
 def random_common_password(length: int = 5, charset: str = string.ascii_lowercase) -> str:
-    all_passwords = list(common_passwords())
-    random.shuffle(all_passwords)
-    for password in all_passwords:
-        if len(password) == length and all(char in charset for char in password):
-            break
-    if password is None:
+    pwds = [p for p in common_passwords() if len(p) == length and all(c in charset for c in p)]
+    if not pwds:
         err_msg = "No suitable password found"
         raise ValueError(err_msg)
-    return password
+    return random_choice(pwds)
 
 
 def generate_password_database(
