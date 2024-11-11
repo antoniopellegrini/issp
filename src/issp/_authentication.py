@@ -6,11 +6,11 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes, hmac
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from ._communication import Layer
-from ._hash import sha256
+from ._functions import hmac_sha256, sha256
 from ._util import xor, zero_pad
 
 if TYPE_CHECKING:
@@ -112,9 +112,7 @@ class HMAC(Authenticator):
         self.key = key or os.urandom(self.code_size)
 
     def compute_code(self, message: bytes) -> bytes:
-        mac = hmac.HMAC(self.key, hashes.SHA256())
-        mac.update(message)
-        return mac.finalize()
+        return hmac_sha256(self.key, message)
 
 
 class RSASigner(Authenticator):

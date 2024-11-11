@@ -9,7 +9,7 @@ from . import _log as log
 
 class Layer(ABC):
     @abstractmethod
-    def send(self, message: bytes) -> None:
+    def send(self, msg: bytes) -> None:
         pass
 
     @abstractmethod
@@ -59,66 +59,147 @@ class PhysicalLayer(Layer):
 class Channel(PhysicalLayer):
     def __init__(self) -> None:
         super().__init__()
-        self._message: bytes | None = None
+        self._msg: bytes | None = None
 
-    def send(self, message: bytes) -> None:
-        self._message = message
+    def send(self, msg: bytes) -> None:
+        self._msg = msg
 
     def receive(self) -> bytes | None:
-        return self._message
+        return self._msg
 
 
 class Actor:
     def __init__(self, name: str, *, quiet: bool = False) -> None:
         self.name = name
-        self._quiet = quiet
+        self.quiet = quiet
 
-    def send(self, layer: Layer, message: bytes | object) -> None:
+    def send(self, layer: Layer, msg: bytes | object) -> None:
         try:
-            layer.send(_try_encode(message))
+            layer.send(_try_encode(msg))
         except Exception as e:
-            self._log("was unable to send: %s (%s)", message, str(e))
+            self._log("was unable to send: %s (%s)", msg, str(e))
         else:
-            self._log("sent: %s", _try_decode(message))
+            self._log("sent: %s", _try_decode(msg))
 
     def receive(self, layer: Layer, *, decode: bool = True) -> bytes | object | None:
         try:
-            message = layer.receive()
+            msg = layer.receive()
         except Exception as e:
             self._log("was unable to receive: %s", str(e))
             return None
         if decode:
-            message = _try_decode(message)
-        self._log("received: %s", message)
-        return message
+            msg = _try_decode(msg)
+        self._log("received: %s", msg)
+        return msg
 
     def _log(self, fmt: str, *args: object) -> None:
-        if not self._quiet:
+        if not self.quiet:
             log.info("%s " + fmt, self.name, *args)
 
 
-def _default_encode(o: object) -> str | object:
-    if isinstance(o, bytes):
-        return base64.b64encode(o).decode("ascii")
-    err_msg = f"Object of type '{o.__class__.__name__}' is not JSON serializable"
-    raise TypeError(err_msg)
+class BankServer(Actor, ABC):
+    @abstractmethod
+    def register(self, msg: dict[str, str | bytes]) -> bool:
+        pass
+
+    @abstractmethod
+    def authenticate(self, msg: dict[str, str | bytes]) -> bool:
+        pass
+
+    def __init__(self, name: str, *, quiet: bool = False) -> None:
+        super().__init__(name, quiet=quiet)
+        self.db: dict[str, dict] = {}
+        self.handlers = {
+            "register": self._register,
+            "perform_transaction": self._perform_transaction,
+        }
+
+    def handle_request(self, channel: Channel) -> None:
+        try:
+            msg = self.receive(channel)
+            action = msg["action"]
+            response = self.handlers[action](msg)
+        except Exception:
+            response = {"status": "invalid request"}
+        self.send(channel, {"action": action} | response)
+
+    def _register(self, msg: dict) -> dict:
+        return {"status": "success" if self.register(msg) else "failure"}
+
+    def _perform_transaction(self, msg: dict) -> dict:
+        if not self.authenticate(msg):
+            return {"status": "authentication failure"}
+
+        user = msg["user"]
+        recipient = msg["recipient"]
+        user_record = self.db[user]
+        recipient_record = self.db[recipient]
+        amount = msg["amount"]
+
+        if user_record["balance"] < amount:
+            return {"status": "insufficient funds"}
+
+        user_record["balance"] -= amount
+        recipient_record["balance"] += amount
+
+        log.info("Current balances: %s", {k: v["balance"] for k, v in self.db.items()})
+
+        return {"status": "success", "user": user, "recipient": recipient, "amount": amount}
 
 
-def _default_decode(d: dict) -> object:
-    return {key: base64.b64decode(value) if "b64" in key else value for key, value in d.items()}
+def _preprocess_bytes(obj: object) -> object:
+    if isinstance(obj, dict):
+        new_obj = {}
+        for key, value in obj.items():
+            if isinstance(value, bytes):
+                new_obj[f"{key}_b64"] = base64.b64encode(value).decode("ascii")
+            elif isinstance(value, dict | list):
+                new_obj[key] = _preprocess_bytes(value)
+            else:
+                new_obj[key] = value
+        return new_obj
+    if isinstance(obj, list):
+        return [_preprocess_bytes(item) for item in obj]
+    return obj
 
 
-def _try_encode(message: bytes | object) -> bytes:
+def _postprocess_bytes(obj: object) -> object:
+    if isinstance(obj, dict):
+        new_obj = {}
+        for key, value in obj.items():
+            if key.endswith("_b64"):
+                new_obj[key[:-4]] = base64.b64decode(value)
+            elif isinstance(value, dict | list):
+                new_obj[key] = _postprocess_bytes(value)
+            else:
+                new_obj[key] = value
+        return new_obj
+    if isinstance(obj, list):
+        return [_postprocess_bytes(item) for item in obj]
+    return obj
+
+
+class BytesAwareJSONEncoder(json.JSONEncoder):
+    def encode(self, o: json.Any) -> str:
+        return super().encode(_preprocess_bytes(o))
+
+
+class BytesAwareJSONDecoder(json.JSONDecoder):
+    def decode(self, s: str) -> json.Any:
+        return _postprocess_bytes(super().decode(s))
+
+
+def _try_encode(msg: bytes | object) -> bytes:
+    if isinstance(msg, bytes):
+        return msg
     try:
-        if isinstance(message, bytes):
-            return message
-        return json.dumps(message, default=_default_encode).encode()
+        return json.dumps(msg, cls=BytesAwareJSONEncoder).encode()
     except Exception:
-        return message
+        return msg
 
 
-def _try_decode(message: bytes | None) -> bytes | object | None:
+def _try_decode(msg: bytes | None) -> bytes | object | None:
     try:
-        return None if message is None else json.loads(message, object_hook=_default_decode)
+        return None if msg is None else json.loads(msg, cls=BytesAwareJSONDecoder)
     except Exception:
-        return message
+        return msg

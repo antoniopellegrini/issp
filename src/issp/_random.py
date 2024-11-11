@@ -4,6 +4,7 @@ import string
 import sys
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from ._authentication import SHA256
 from ._encryption import AES, BlockCipher
@@ -167,15 +168,13 @@ class TRNG(RNG[bytes]):
         return os.urandom(size)
 
 
-def random_string(
-    length: int,
-    charset: str = string.printable,
-) -> str:
+def random_string(length: int, charset: str = string.printable) -> str:
     return "".join(secrets.choice(charset) for _ in range(length))
 
 
-def random_int(
-    min_value: int = 0,
-    max_value: int = 2**32 - 1,
-) -> int:
+def random_int(min_value: int = 0, max_value: int = 2**32 - 1) -> int:
     return secrets.randbelow(max_value - min_value + 1) + min_value
+
+
+def random_choice[T](sequence: Sequence[T]) -> T:
+    return secrets.choice(sequence)
