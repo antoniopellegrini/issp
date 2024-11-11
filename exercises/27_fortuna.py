@@ -36,16 +36,30 @@ class EntropyPool:
         self._pool.clear()
         return entropy
 
+def accumulate_entropy(self) -> None:
+    for source in self._sources:
+        for pool in self._pools:
+            pool.add_entropy(source.get_entropy())
+
+
 
 class Fortuna(RNG):
     def set_seed(self, seed: bytes) -> None:
-        # Implement.
+        self._cypher.key = seed
         pass
 
     def next_value(self) -> bytes:
-        # Implement.
+        self._accumulate_entropy()
+        if len(self._pools[0]) >=  self.RESEED_LENGTH:
+            self._reseed()
+        self
         pass
 
+    def _reseed(self) -> None:
+        self._reseed_counter += 1
+        entropy = self._get_entropy()
+        key = self._hash.compute_code(self._cipher.key + self._hash.compute_code(entropy))
+        self.set_seed(key)
 
 def main() -> None:
     alice = Actor("Alice")

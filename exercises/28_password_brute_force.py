@@ -1,3 +1,4 @@
+import itertools
 # Crack the provided password using a brute-force attack.
 #
 # Hint: You can use itertools.product to generate all possible passwords of a given length,
@@ -20,7 +21,14 @@ def main() -> None:
     password = hash_func(password.encode())
 
     # Crack the password.
+    for length in itertools.count(start=1):
+        for guess in itertools.product(charset, repeat=length):
+            guess = "".join(guess)
+            if hash_func(guess.encode()) == password:
+                log.info("Password cracked: %s", guess)
+                return
 
 
 if __name__ == "__main__":
     main()
+
