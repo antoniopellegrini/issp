@@ -27,8 +27,22 @@ def main() -> None:
     # Create a dictionary containing hashed passwords as keys and plaintext passwords as values,
     # then use it to crack as many passwords as possible.
 
+    # distionary coomprehension
+    hashes = {
+        hash_func(password.encode()): password
+        for password in common
+    }
+
+    for user, data in db.items():
+        password = hashes.get(data['password'])
+        if password:
+            cracked[user] = hashes[data['password']]
+
+
+
     log.info("Cracked passwords: %d of %d", len(cracked), len(db))
     log.info("First 10 cracked passwords:")
+
     for i, password in islice(cracked.items(), 10):
         log.info("%d: %s", i, password)
 
