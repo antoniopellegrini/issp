@@ -1,11 +1,13 @@
 # 1) Implement a two-factor authentication protocol where the user authenticates by sending
-#    a username, password, and Time-based One-Time Password (TOTP) to the server.
-#    The TOTP should be 6 digits long, and it should change every 2 seconds.
+#    a username, password, and HMAC-based One-Time Password (HOTP) to the server.
+#    The HOTP should be 6 digits long.
 #
 # 2) Help Mallory attack the protocol by replaying Alice's transaction request.
 #    Is the attack successful? Why?
 #
-# 3) Fix the vulnerability in the protocol by disallowing the reuse of OTPs.
+# Hint: you can use the hmac_sha1 function from the issp module to compute the HMAC.
+#       To compute the truncate() function, you can extract the least significant 31 bits
+#       of the HMAC value (value & 0x7FFFFFFF).
 
 import os
 import time
@@ -18,27 +20,51 @@ from issp import (
     Channel,
     EncryptionLayer,
     RSASigner,
+    hmac_sha1,
     log,
+    scrypt,
 )
 
 
-class TOTP:
+class HOTP:
+    DIGITS = 6
+
     def __init__(self, key: bytes) -> None:
         self.key = key
+        self._counter = 0
 
     def get_otp(self) -> int:
-        # Implement.
-        return 0
+        self._counter += 1
+        mac = hmac_sha1(self._counter.to_bytes(8), self.key)
+        return (int.from_bytes(mac) & 0x7FFFFFFF) % 10**self.DIGITS
 
 
 class Server(BankServer):
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "salt": (salt := os.urandom(16)),
+            "password": scrypt(msg["password"], salt=salt),
+            "otp": HOTP(msg["otp_key"]),
+            "balance": msg["balance"],
+        }
+        return True
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+
+        # First factor: password.
+        if scrypt(msg["password"], salt=record["salt"]) != record["password"]:
+            return False
+
+        # Second factor: OTP.
+        otp: HOTP = record["otp"]
+        return otp.get_otp() == int(msg["otp"])
 
 
 def main() -> None:
@@ -60,7 +86,7 @@ def main() -> None:
     server.handle_request(channel)
 
     alice_password = "p4ssw0rd"
-    alice_otp = TOTP(os.urandom(16))
+    alice_otp = HOTP(os.urandom(16))
     message = {
         "action": "register",
         "user": alice.name,
@@ -85,10 +111,15 @@ def main() -> None:
             "amount": 1000.0,
         }
         alice.send(secure_channel, message)
+        if i == transaction_count - 1:
+            # Capture the last transaction request.
+            captured_request = mallory.receive(channel)
         server.handle_request(secure_channel)
 
     # Replay an authenticated transaction request.
     log.info("Replaying authenticated transaction request...")
+    mallory.send(channel, captured_request)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,10 @@
-# 1) Implement a two-factor authentication protocol where the user authenticates by sending
-#    a username, password, and Time-based One-Time Password (TOTP) to the server.
-#    The TOTP should be 6 digits long, and it should change every 2 seconds.
+# 1) Implement a naive authentication protocol where the user authenticates by sending
+#    a username and password to the server. The server should store the password hashed
+#    and salted using a slow hash function.
 #
 # 2) Help Mallory attack the protocol by replaying Alice's transaction request.
-#    Is the attack successful? Why?
-#
-# 3) Fix the vulnerability in the protocol by disallowing the reuse of OTPs.
 
 import os
-import time
 
 from issp import (
     AES,
@@ -19,26 +15,28 @@ from issp import (
     EncryptionLayer,
     RSASigner,
     log,
+    scrypt,
 )
-
-
-class TOTP:
-    def __init__(self, key: bytes) -> None:
-        self.key = key
-
-    def get_otp(self) -> int:
-        # Implement.
-        return 0
 
 
 class Server(BankServer):
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "salt": (salt := os.urandom(16)),
+            "password": scrypt(msg["password"], salt=salt),
+            "balance": msg["balance"],
+        }
+        return True
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+        return scrypt(msg["password"], salt=record["salt"]) == record["password"]
 
 
 def main() -> None:
@@ -53,42 +51,37 @@ def main() -> None:
         "action": "register",
         "user": mallory.name,
         "password": "s3cr3t",
-        "otp_key": os.urandom(16),
         "balance": 1000.0,
     }
     mallory.send(channel, message)
     server.handle_request(channel)
 
     alice_password = "p4ssw0rd"
-    alice_otp = TOTP(os.urandom(16))
     message = {
         "action": "register",
         "user": alice.name,
         "password": alice_password,
-        "otp_key": alice_otp.key,
         "balance": 100000.0,
     }
     alice.send(secure_channel, message)
     server.handle_request(secure_channel)
 
-    # Authenticated transactions.
-    transaction_count = 10
-    for i in range(transaction_count):
-        time.sleep(1)
-        log.info("Transaction %d", i + 1)
-        message = {
-            "action": "perform_transaction",
-            "user": alice.name,
-            "password": alice_password,
-            "otp": alice_otp.get_otp(),
-            "recipient": "Mallory",
-            "amount": 1000.0,
-        }
-        alice.send(secure_channel, message)
-        server.handle_request(secure_channel)
+    # Authenticated transaction.
+    message = {
+        "action": "perform_transaction",
+        "user": alice.name,
+        "password": alice_password,
+        "recipient": "Mallory",
+        "amount": 1000.0,
+    }
+    alice.send(secure_channel, message)
+    captured_request = mallory.receive(channel)
+    server.handle_request(secure_channel)
 
     # Replay an authenticated transaction request.
     log.info("Replaying authenticated transaction request...")
+    mallory.send(channel, captured_request)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":

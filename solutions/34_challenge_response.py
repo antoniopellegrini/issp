@@ -5,6 +5,7 @@
 # 2) Help Mallory attack the protocol by replaying Alice's transaction requests.
 #    Is the attack successful? Why?
 
+import os
 
 from issp import (
     AES,
@@ -14,6 +15,8 @@ from issp import (
     Channel,
     EncryptionLayer,
     RSASigner,
+    log,
+    scrypt,
 )
 
 
@@ -23,16 +26,27 @@ class Server(BankServer):
         self.handlers["request_transaction"] = self.send_challenge
 
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "salt": (salt := os.urandom(16)),
+            "password": scrypt(msg["password"], salt=salt),
+            "balance": msg["balance"],
+        }
+        return True
 
     def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
-        # Implement by returning the challenge and stored salt.
-        return {"challenge": None, "salt": None}
+        record = self.db[msg["user"]]
+        record["challenge"] = os.urandom(16)
+        return {"challenge": record["challenge"], "salt": record["salt"]}
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+        return scrypt(record.pop("challenge") + record["password"]) == msg["token"]
 
 
 def main() -> None:
@@ -68,13 +82,14 @@ def main() -> None:
         "user": alice.name,
     }
     alice.send(secure_channel, message)
+    replay_msg_1 = mallory.receive(channel)
 
     # Challenge.
     server.handle_request(secure_channel)
     message = alice.receive(secure_channel)
 
     # Authenticated transaction.
-    token = b""  # Implement the response to the challenge.
+    token = scrypt(message["challenge"] + scrypt(alice_password, salt=message["salt"]))
     message = {
         "action": "perform_transaction",
         "user": alice.name,
@@ -83,9 +98,15 @@ def main() -> None:
         "amount": 1000.0,
     }
     alice.send(secure_channel, message)
+    replay_msg_2 = mallory.receive(channel)
     server.handle_request(secure_channel)
 
     # Replay an authentication sequence.
+    log.info("Replaying authentication sequence...")
+    mallory.send(channel, replay_msg_1)
+    server.handle_request(secure_channel)
+    mallory.send(channel, replay_msg_2)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":
