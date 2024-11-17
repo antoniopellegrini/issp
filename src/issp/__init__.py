@@ -12,7 +12,7 @@ from ._authentication import (
     RSASigner,
 )
 from ._biometric import biometric_template, euclidean_distance, euclidean_similarity
-from ._communication import Actor, BankServer, Channel, Layer
+from ._communication import Actor, AntiReplayLayer, BankServer, Channel, Layer
 from ._encryption import (
     AES,
     OTP,
@@ -37,6 +37,7 @@ __all__ = [
     "Actor",
     "AES",
     "ANSIx917",
+    "AntiReplayLayer",
     "AsymmetricCipher",
     "Authenticator",
     "AuthenticationLayer",
