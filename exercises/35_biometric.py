@@ -113,7 +113,7 @@ def main() -> None:
         "action": "perform_transaction",
         "user": alice.name,
         "template": biometric_template(alice),
-        "challenge": token,
+        "token": token,
         "recipient": "Mallory",
         "amount": 1000.0,
     }

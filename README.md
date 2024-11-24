@@ -18,7 +18,7 @@ at the [Polytechnic University of Bari](https://www.poliba.it).
 - Activate the virtual environment:
     ```
     Linux/macOS: source .venv/bin/activate
-    Windows:     .venv\Scripts\activate.bat
+    Windows:     .venv\Scripts\activate
     ```
 
 - Install the library and its dependencies:

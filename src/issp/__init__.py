@@ -25,12 +25,14 @@ from ._encryption import (
     SymmetricCipher,
 )
 from ._functions import hmac_sha1, hmac_sha256, scrypt, scrypt_fast, sha1, sha256
+from ._malware import DeleteFiles, Malware, Payload, Propagation, Ransomware, Scareware, StorageWorm
 from ._password import (
     common_passwords,
     generate_password_database,
     random_common_password,
 )
 from ._random import LCG, RNG, TRNG, ANSIx917, CounterRNG, random_choice, random_int, random_string
+from ._system import Path, System
 from ._util import byte_size, xor, zero_pad
 
 __all__ = [
@@ -46,6 +48,7 @@ __all__ = [
     "Channel",
     "Cipher",
     "CounterRNG",
+    "DeleteFiles",
     "DigitalEnvelope",
     "EncryptedHashMAC",
     "EncryptionLayer",
@@ -53,12 +56,20 @@ __all__ = [
     "KeyedHashMAC",
     "Layer",
     "LCG",
+    "Malware",
     "OTP",
+    "Path",
+    "Payload",
+    "Propagation",
+    "Ransomware",
     "RNG",
     "RSASigner",
     "RSA",
+    "Scareware",
     "SHA256",
+    "StorageWorm",
     "SymmetricCipher",
+    "System",
     "TRNG",
     "XOR",
     "biometric_template",

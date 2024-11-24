@@ -1,0 +1,7 @@
+Grocery List:
+- Milk
+- Bread
+- Eggs
+
+Reminders:
+- Doctor's appointment at 3 PM on Thursday.

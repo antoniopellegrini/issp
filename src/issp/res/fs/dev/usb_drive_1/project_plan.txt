@@ -1,0 +1,7 @@
+Project: Home Renovation
+
+Tasks:
+1. Research paint colors.
+2. Hire a contractor.
+3. Plan budget.
+4. Set timeline for completion.

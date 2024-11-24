@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 
-from cryptography.hazmat.primitives import ciphers, hashes, padding
+from cryptography.hazmat.primitives import ciphers, hashes, padding, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asymmetric_padding, rsa
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
@@ -77,7 +77,15 @@ class BlockCipher(SymmetricCipher, ABC):
 
 
 class AsymmetricCipher(Cipher, ABC):
-    pass
+    @property
+    @abstractmethod
+    def public_key(self) -> bytes:
+        pass
+
+    @property
+    @abstractmethod
+    def private_key(self) -> bytes:
+        pass
 
 
 class OTP(SymmetricCipher):
@@ -145,31 +153,62 @@ class RSA(AsymmetricCipher):
     )
 
     @property
+    def public_key(self) -> bytes | None:
+        return self._public_key_bytes
+
+    @public_key.setter
+    def public_key(self, key: bytes) -> None:
+        self._public_key_bytes = key
+        self._public_key = serialization.load_pem_public_key(key) if key else None
+
+    @property
+    def private_key(self) -> bytes | None:
+        return self._private_key_bytes
+
+    @private_key.setter
+    def private_key(self, key: bytes) -> None:
+        self._private_key_bytes = key
+        self._private_key = serialization.load_pem_private_key(key, password=None) if key else None
+
+    @property
     def key_size(self) -> int:
-        return self.public_key.key_size // 8
+        return self._public_key.key_size // 8
 
-    def __init__(self, key: rsa.RSAPublicKey | rsa.RSAPrivateKey | int | None = None) -> None:
-        if key is None:
-            key = 2048
+    def __init__(
+        self,
+        public_key: bytes | int | None = None,
+        private_key: bytes | None = None,
+    ) -> None:
+        if public_key is None and private_key is None:
+            public_key = 2048
 
-        if isinstance(key, int):
-            key = rsa.generate_private_key(public_exponent=65537, key_size=key)
-
-        if isinstance(key, rsa.RSAPrivateKey):
-            self.private_key = key
-            self.public_key = key.public_key()
+        if isinstance(public_key, int):
+            self._private_key = rsa.generate_private_key(public_exponent=65537, key_size=public_key)
+            self._private_key_bytes = self._private_key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.TraditionalOpenSSL,
+                serialization.NoEncryption(),
+            )
+            self._public_key = self._private_key.public_key()
+            self._public_key_bytes = self._public_key.public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
         else:
-            self.private_key = None
-            self.public_key = key
+            self.public_key = public_key
+            self.private_key = private_key
 
     def encrypt(self, message: bytes) -> bytes:
-        return self.public_key.encrypt(message, self._padding)
+        if not self._public_key:
+            err_msg = "Cannot encrypt without a public key"
+            raise ValueError(err_msg)
+        return self._public_key.encrypt(message, self._padding)
 
     def decrypt(self, message: bytes) -> bytes:
-        if not self.private_key:
+        if not self._private_key:
             err_msg = "Cannot decrypt without a private key"
             raise ValueError(err_msg)
-        return self.private_key.decrypt(message, self._padding)
+        return self._private_key.decrypt(message, self._padding)
 
 
 class DigitalEnvelope(Cipher):

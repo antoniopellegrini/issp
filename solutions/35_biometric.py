@@ -61,7 +61,7 @@ class Server(BankServer):
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
         if (record := self.db.get(msg["user"])) is None:
             return False
-        if record.pop("challenge") != msg["challenge"]:
+        if record.pop("challenge") != msg["token"]:
             return False
         return similarity(record["template"], msg["template"]) >= self.THRESHOLD
 
@@ -142,7 +142,7 @@ def main() -> None:
         "action": "perform_transaction",
         "user": alice.name,
         "template": biometric_template(alice),
-        "challenge": token,
+        "token": token,
         "recipient": "Mallory",
         "amount": 1000.0,
     }
