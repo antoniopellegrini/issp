@@ -18,27 +18,73 @@ from issp import (
     Channel,
     EncryptionLayer,
     RSASigner,
+    hmac_sha1,
     log,
+    scrypt,
 )
 
 
 class TOTP:
+    DIGITS = 6
+    PERIOD = 2
+    EPOCH = 0
+
     def __init__(self, key: bytes) -> None:
         self.key = key
 
     def get_otp(self) -> int:
-        # Implement.
-        return 0
+        counter = int((time.time() - self.EPOCH) / self.PERIOD)
+        mac = hmac_sha1(counter.to_bytes(8), self.key)
+        return (int.from_bytes(mac) & 0x7FFFFFFF) % 10**self.DIGITS
 
 
 class Server(BankServer):
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "salt": (salt := os.urandom(16)),
+            "password": scrypt(msg["password"], salt=salt),
+            "otp": TOTP(msg["otp_key"]),
+            "balance": msg["balance"],
+        }
+        return True
+
+    def _authenticate_vulnerable(self, msg: dict[str, str | bytes]) -> bool:
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+
+        # First factor: password.
+        if scrypt(msg["password"], salt=record["salt"]) != record["password"]:
+            return False
+
+        # Second factor: OTP.
+        otp: TOTP = record["otp"]
+        return otp.get_otp() == int(msg["otp"])
+
+    def _authenticate_secure(self, msg: dict[str, str | bytes]) -> bool:
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+
+        # First factor: password.
+        if scrypt(msg["password"], salt=record["salt"]) != record["password"]:
+            return False
+
+        # Second factor: OTP.
+        otp: TOTP = record["otp"]
+        received_otp = int(msg["otp"])
+
+        if received_otp == record.get("last_otp") or received_otp != otp.get_otp():
+            return False
+
+        record["last_otp"] = received_otp
+        return True
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        return self._authenticate_secure(msg)
 
 
 def main() -> None:
@@ -85,10 +131,15 @@ def main() -> None:
             "amount": 1000.0,
         }
         alice.send(secure_channel, message)
+        if i == transaction_count - 1:
+            # Capture the last transaction request.
+            captured_request = mallory.receive(channel)
         server.handle_request(secure_channel)
 
     # Replay an authenticated transaction request.
     log.info("Replaying authenticated transaction request...")
+    mallory.send(channel, captured_request)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":

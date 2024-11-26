@@ -1,15 +1,11 @@
-# 1) Implement a biometric challenge-response protocol. The server should store the biometric
-#    template of each user. The similarity measure should be based on the Euclidean distance
-#    between biometric templates. The threshold for successful authentication should be 0.95.
+# 1) Implement a password-based challenge-response protocol. The server should store the password
+#    hashed and salted using a slow hash function. Use the same hash function to compute the
+#    challenge-response token.
 #
 # 2) Help Mallory attack the protocol by replaying Alice's transaction requests.
 #    Is the attack successful? Why?
-#
-# 3) Additionally, implement a biometric identification service.
-#
-# Hint: The similarity of two biometric templates can be computed as
-#       1.0 / (1.0 + euclidean_distance(template1, template2)).
 
+import os
 
 from issp import (
     AES,
@@ -19,7 +15,8 @@ from issp import (
     Channel,
     EncryptionLayer,
     RSASigner,
-    biometric_template,
+    log,
+    scrypt,
 )
 
 
@@ -27,29 +24,33 @@ class Server(BankServer):
     def __init__(self, name: str, *, quiet: bool = False) -> None:
         super().__init__(name, quiet=quiet)
         self.handlers["request_transaction"] = self.send_challenge
-        self.handlers["identify"] = self.identify
 
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "salt": (salt := os.urandom(16)),
+            "password": scrypt(msg["password"], salt=salt),
+            "balance": msg["balance"],
+        }
+        return True
 
     def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
-        # Implement by returning the challenge.
-        return {"challenge": None}
+        record = self.db[msg["user"]]
+        record["challenge"] = os.urandom(16)
+        return {"challenge": record["challenge"], "salt": record["salt"]}
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
-
-    def identify(self, msg: dict[str, str | bytes]) -> dict:
-        # Implement by returning the user that matches the received biometric template.
-        matched = None
-        return {"status": "success", "user": matched} if matched else {"status": "no match"}
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+        return scrypt(record.pop("challenge") + record["password"]) == msg["token"]
 
 
 def main() -> None:
     alice = Actor("Alice")
-    bob = Actor("Bob")
     mallory = Actor("Mallory")
     server = Server("Server")
     channel = Channel()
@@ -59,42 +60,21 @@ def main() -> None:
     message = {
         "action": "register",
         "user": mallory.name,
-        "template": biometric_template(mallory),
+        "password": "s3cr3t",
         "balance": 1000.0,
     }
     mallory.send(channel, message)
     server.handle_request(channel)
 
+    alice_password = "p4ssw0rd"
     message = {
         "action": "register",
         "user": alice.name,
-        "template": biometric_template(alice),
+        "password": alice_password,
         "balance": 100000.0,
     }
     alice.send(secure_channel, message)
     server.handle_request(secure_channel)
-
-    # Identification.
-    message = {
-        "action": "identify",
-        "template": biometric_template(alice),
-    }
-    alice.send(secure_channel, message)
-    server.handle_request(secure_channel)
-
-    message = {
-        "action": "identify",
-        "template": biometric_template(mallory),
-    }
-    mallory.send(channel, message)
-    server.handle_request(channel)
-
-    message = {
-        "action": "identify",
-        "template": biometric_template(bob),
-    }
-    bob.send(channel, message)
-    server.handle_request(channel)
 
     # Transaction request.
     message = {
@@ -102,25 +82,31 @@ def main() -> None:
         "user": alice.name,
     }
     alice.send(secure_channel, message)
+    replay_msg_1 = mallory.receive(channel)
 
     # Challenge.
     server.handle_request(secure_channel)
     message = alice.receive(secure_channel)
 
-    # Response.
-    token = b""  # Implement the response to the challenge.
+    # Authenticated transaction.
+    token = scrypt(message["challenge"] + scrypt(alice_password, salt=message["salt"]))
     message = {
         "action": "perform_transaction",
         "user": alice.name,
-        "template": biometric_template(alice),
         "token": token,
         "recipient": "Mallory",
         "amount": 1000.0,
     }
     alice.send(secure_channel, message)
+    replay_msg_2 = mallory.receive(channel)
     server.handle_request(secure_channel)
 
     # Replay an authentication sequence.
+    log.info("Replaying authentication sequence...")
+    mallory.send(channel, replay_msg_1)
+    server.handle_request(secure_channel)
+    mallory.send(channel, replay_msg_2)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":

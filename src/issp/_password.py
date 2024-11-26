@@ -5,13 +5,11 @@ import time
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import cache
-from pathlib import Path
 
 from . import _log as log
+from ._config import RES_DIR
 from ._functions import hmac_sha1, scrypt
 from ._random import random_choice, random_int, random_string
-
-RES_DIR = Path(__file__).parent / "res"
 
 
 def _hotp(key: bytes, counter: int, digits: int = 6) -> int:

@@ -10,6 +10,7 @@
 # Hint: The similarity of two biometric templates can be computed as
 #       1.0 / (1.0 + euclidean_distance(template1, template2)).
 
+import os
 
 from issp import (
     AES,
@@ -20,30 +21,57 @@ from issp import (
     EncryptionLayer,
     RSASigner,
     biometric_template,
+    log,
 )
 
 
+def euclidean_distance(a: list[float], b: list[float]) -> float:
+    return sum((x - y) ** 2 for x, y in zip(a, b, strict=True)) ** 0.5
+
+
+def similarity(a: list[float], b: list[float]) -> float:
+    return 1.0 / (1.0 + euclidean_distance(a, b))
+
+
 class Server(BankServer):
+    THRESHOLD = 0.95
+
     def __init__(self, name: str, *, quiet: bool = False) -> None:
         super().__init__(name, quiet=quiet)
         self.handlers["request_transaction"] = self.send_challenge
         self.handlers["identify"] = self.identify
 
     def register(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        user = msg["user"]
+
+        if user in self.db:
+            return False
+
+        self.db[user] = {
+            "template": msg["template"],
+            "balance": msg["balance"],
+        }
+        return True
 
     def send_challenge(self, msg: dict[str, str | bytes]) -> dict:
-        # Implement by returning the challenge.
-        return {"challenge": None}
+        record = self.db[msg["user"]]
+        record["challenge"] = os.urandom(16)
+        return {"challenge": record["challenge"]}
 
     def authenticate(self, msg: dict[str, str | bytes]) -> bool:
-        # Implement.
-        return False
+        if (record := self.db.get(msg["user"])) is None:
+            return False
+        if record.pop("challenge") != msg["token"]:
+            return False
+        return similarity(record["template"], msg["template"]) >= self.THRESHOLD
 
     def identify(self, msg: dict[str, str | bytes]) -> dict:
-        # Implement by returning the user that matches the received biometric template.
+        template = msg["template"]
         matched = None
+        for user, record in self.db.items():
+            if similarity(record["template"], template) >= self.THRESHOLD:
+                matched = user
+                break
         return {"status": "success", "user": matched} if matched else {"status": "no match"}
 
 
@@ -102,13 +130,14 @@ def main() -> None:
         "user": alice.name,
     }
     alice.send(secure_channel, message)
+    captured_message_1 = mallory.receive(channel)
 
     # Challenge.
     server.handle_request(secure_channel)
     message = alice.receive(secure_channel)
 
     # Response.
-    token = b""  # Implement the response to the challenge.
+    token = message["challenge"]
     message = {
         "action": "perform_transaction",
         "user": alice.name,
@@ -118,9 +147,15 @@ def main() -> None:
         "amount": 1000.0,
     }
     alice.send(secure_channel, message)
+    captured_message_2 = mallory.receive(channel)
     server.handle_request(secure_channel)
 
     # Replay an authentication sequence.
+    log.info("Replaying authentication sequence...")
+    mallory.send(channel, captured_message_1)
+    server.handle_request(secure_channel)
+    mallory.send(channel, captured_message_2)
+    server.handle_request(secure_channel)
 
 
 if __name__ == "__main__":

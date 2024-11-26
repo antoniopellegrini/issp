@@ -68,6 +68,28 @@ class Channel(PhysicalLayer):
         return self._msg
 
 
+class AntiReplayLayer(Layer):
+    # Note: This is only secure if the underlying layers provide authentication.
+
+    COUNTER_SIZE = 8
+
+    def __init__(self, layer: Layer | None = None) -> None:
+        super().__init__(layer)
+        self._counter = 0
+
+    def send(self, msg: bytes) -> None:
+        self._counter += 1
+        self.lower_layer.send(msg + self._counter.to_bytes(self.COUNTER_SIZE))
+
+    def receive(self) -> bytes | None:
+        if (msg := self.lower_layer.receive()) is None:
+            return None
+        if int.from_bytes(msg[-self.COUNTER_SIZE :]) < self._counter:
+            err_msg = "Replay attack detected"
+            raise ValueError(err_msg)
+        return msg[: -self.COUNTER_SIZE]
+
+
 class Actor:
     def __init__(self, name: str, *, quiet: bool = False) -> None:
         self.name = name
@@ -115,13 +137,14 @@ class BankServer(Actor, ABC):
         }
 
     def handle_request(self, channel: Channel) -> None:
+        action = None
         try:
             msg = self.receive(channel)
             action = msg["action"]
             response = self.handlers[action](msg)
         except Exception:
             response = {"status": "invalid request"}
-        self.send(channel, {"action": action} | response)
+        self.send(channel, {"action": action} | response if action else response)
 
     def _register(self, msg: dict) -> dict:
         return {"status": "success" if self.register(msg) else "failure"}

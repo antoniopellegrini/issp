@@ -1,5 +1,6 @@
 # 1) Implement a password-based challenge-response protocol. The server should store the password
-#    hashed and salted using a slow hash function.
+#    hashed and salted using a slow hash function. Use the same hash function to compute the
+#    challenge-response token.
 #
 # 2) Help Mallory attack the protocol by replaying Alice's transaction requests.
 #    Is the attack successful? Why?

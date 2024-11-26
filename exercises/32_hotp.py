@@ -1,5 +1,6 @@
 # 1) Implement a two-factor authentication protocol where the user authenticates by sending
 #    a username, password, and HMAC-based One-Time Password (HOTP) to the server.
+#    The HOTP should be 6 digits long.
 #
 # 2) Help Mallory attack the protocol by replaying Alice's transaction request.
 #    Is the attack successful? Why?
